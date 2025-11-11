@@ -3,38 +3,34 @@ import socket
 import json
 from logicaBatalhaNaval import iniciarBatalhao
 
-# define tamanho de tela, grid, margens e tamanho das fontes
 SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 600
 GRID_SIZE = 40
 MARGIN = 5
 FONT_SIZE = 20
 
-# cores usadas no pygame
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-BLUE = (104, 207, 239) # cor da agua
-GREEN = (0, 255, 0)    # cor dos seus navios
-RED = (255, 0, 0)      # cor do tiro errado
-ORANGE = (255, 165, 0) # cor do acerto
+BLUE = (104, 207, 239) 
+GREEN = (0, 255, 0)    
+RED = (255, 0, 0)      
+ORANGE = (255, 165, 0) 
 
-# alinhamento dos grids
 MY_GRID_OFFSET_X, MY_GRID_OFFSET_Y = 50, 100
 ENEMY_GRID_OFFSET_X, ENEMY_GRID_OFFSET_Y = 650, 100
 
-
-# inicialização padrão do pygame
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Batalha Naval")
 font = pygame.font.Font(None, FONT_SIZE)
 big_font = pygame.font.Font(None, 40)
 
-# CONFIGURAÇÃO do socket UDP
+BOTAO_JOGAR_NOVAMENTE_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 125, SCREEN_HEIGHT // 2 + 50, 250, 50) 
+
+# Configuração do socket UDP
 HOST = '127.0.0.1'
 PORT = 12345
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-client_socket.setblocking(False) # se não houver dados, não bloqueia a execução
+client_socket.setblocking(False) 
 
 meu_batalhao = iniciarBatalhao()
 meus_tiros = set()
@@ -42,19 +38,15 @@ danos_inimigos = set()
 tiros_inimigos = set()
 meu_turno = False
 game_over = False
-mensagem = "Conectando ao servidor..."
+mensagem = "Procurando partida..."
 
-# faz o grid 10x10 com todos seus detalhes, titulo, navios, labels e etc...
-def desenhaOsGrids(offset_x, offset_y, titulo, show_ships=False):
+def desenha_os_grids(offset_x, offset_y, titulo, show_ships=False):
+    # Estrutura o mapa do jogo para ser desenhado na tela
     tituloPrincipal = big_font.render(titulo, True, BLACK)
     screen.blit(tituloPrincipal, (offset_x, offset_y - 50))
 
     for linha in range(10):
         for coluna in range(10):
-            # desenha os nomes das linhas e colunas
-
-            # se linha for 0 desenha os números das colunas
-            # se coluna for 0 desenha as letras das linhas
             if linha == 0:
                 coluna_label = font.render(str(coluna + 1), True, BLACK)
                 screen.blit(coluna_label, (offset_x + coluna * (GRID_SIZE + MARGIN) + GRID_SIZE // 2, offset_y - 20))
@@ -62,85 +54,108 @@ def desenhaOsGrids(offset_x, offset_y, titulo, show_ships=False):
                 linha_label = font.render(chr(ord('A') + linha), True, BLACK)
                 screen.blit(linha_label, (offset_x - 20, offset_y + linha * (GRID_SIZE + MARGIN) + GRID_SIZE // 2))
 
-            # desenha cada célula retangular do grid 
             rect = pygame.Rect(offset_x + coluna * (GRID_SIZE + MARGIN),
                                offset_y + linha * (GRID_SIZE + MARGIN),
                                GRID_SIZE, GRID_SIZE)
             
-            colunaor = BLUE
+            cor = BLUE 
 
-            # se for o "Seu Batalhão"
-            if show_ships:
+            if show_ships: 
                 if (linha, coluna) in meu_batalhao:
-                    colunaor = GREEN
-                if (linha, coluna) in tiros_inimigos: # Shots taken by the enemy on my board
-                    colunaor = ORANGE if (linha, coluna) in meu_batalhao else RED
-            # Logica for "Batalhão Inimigo"
-            # Logic for "Batalhão Inimigo"
-            else:
+                    cor = GREEN
+                if (linha, coluna) in tiros_inimigos:
+                    cor = BLACK if (linha, coluna) in meu_batalhao else RED
+            else: 
                 if (linha, coluna) in danos_inimigos:    
-                    colunaor = ORANGE             
+                    cor = ORANGE             
                 elif (linha, coluna) in meus_tiros:  
-                    colunaor = RED
+                    cor = RED
             
-            pygame.draw.rect(screen, colunaor, rect)
+            pygame.draw.rect(screen, cor, rect)
 
-# envia mensagem para o servidor UDP em formato JSON
 def enviar_mensagem(msg_type, data):
-    mensagem = json.dumps({"type": msg_type, "data": data})
-    client_socket.sendto(mensagem.encode(), (HOST, PORT))
+    # Envia uma mensagem formatada em JSON para o servidor.
+    mensagem_json = json.dumps({"type": msg_type, "data": data})
+    client_socket.sendto(mensagem_json.encode(), (HOST, PORT))
+    # Imprime no terminal do cliente o que foi enviado
+    print(f"[ENVIOU] -> Tipo: {msg_type}, Dados: {data}")
 
-# logica principal do jogo
-enviar_mensagem("connect", "") # inicia a conexão com o servidor
+def botao_jogar_novamente():
+    pygame.draw.rect(screen, BLUE, BOTAO_JOGAR_NOVAMENTE_RECT, border_radius=10) 
+    texto_botao = big_font.render("Jogar Novamente", True, BLACK)
+    texto_rect = texto_botao.get_rect(center=BOTAO_JOGAR_NOVAMENTE_RECT.center)
+    screen.blit(texto_botao, texto_rect)
+
+def reiniciar_jogo():
+    global meu_batalhao, meus_tiros, danos_inimigos, tiros_inimigos, meu_turno, game_over, mensagem
+    
+    meu_batalhao = iniciarBatalhao()
+    meus_tiros = set()
+    danos_inimigos = set()
+    tiros_inimigos = set()
+    meu_turno = False
+    game_over = False
+    mensagem = "Procurando partida..."
+    
+    enviar_mensagem("join", "")
+
+
+# Lógica do jogo rodando
+enviar_mensagem("join", "") 
 rodando = True
 while rodando:
-    # para cada evento do pygame se já for para fechar a janela ou clicar no grid inimigo faz a ação correspondente
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
+            if not game_over: 
+                enviar_mensagem("leave", "") 
             rodando = False
 
-        # faz a parte do clique do mouse para atirar se for o meu turno e o jogo não tiver acabado
-        if event.type == pygame.MOUSEBUTTONDOWN and meu_turno and not game_over:
+        if event.type == pygame.MOUSEBUTTONDOWN:
             pos = pygame.mouse.get_pos()
             
-            # ve se o evento de clique foi dentro do grid inimigo
-            if ENEMY_GRID_OFFSET_X < pos[0] < ENEMY_GRID_OFFSET_X + 10 * (GRID_SIZE + MARGIN) and \
-               ENEMY_GRID_OFFSET_Y < pos[1] < ENEMY_GRID_OFFSET_Y + 10 * (GRID_SIZE + MARGIN):
-                
-                coluna = (pos[0] - ENEMY_GRID_OFFSET_X) // (GRID_SIZE + MARGIN)
-                linha = (pos[1] - ENEMY_GRID_OFFSET_Y) // (GRID_SIZE + MARGIN)
-                
-                # envia o tiro se ainda não tiver atirado nessa coordenada
-                if (linha, coluna) not in meus_tiros:
-                    meus_tiros.add((linha, coluna))
-                    enviar_mensagem("tiro", (linha, coluna))
-                    meu_turno = False # End turn after shooting
+            if game_over:
+                if BOTAO_JOGAR_NOVAMENTE_RECT.collidepoint(pos):
+                    reiniciar_jogo()
+                    continue 
+            
+            if meu_turno and not game_over:
+                if ENEMY_GRID_OFFSET_X < pos[0] < ENEMY_GRID_OFFSET_X + 10 * (GRID_SIZE + MARGIN) and \
+                   ENEMY_GRID_OFFSET_Y < pos[1] < ENEMY_GRID_OFFSET_Y + 10 * (GRID_SIZE + MARGIN):
+                    
+                    coluna = (pos[0] - ENEMY_GRID_OFFSET_X) // (GRID_SIZE + MARGIN)
+                    linha = (pos[1] - ENEMY_GRID_OFFSET_Y) // (GRID_SIZE + MARGIN)
+                    
+                    if (linha, coluna) not in meus_tiros:
+                        meus_tiros.add((linha, coluna))
+                        enviar_mensagem("tiro", (linha, coluna))
+                        meu_turno = False 
 
-    # recebe mensagens do servidor UDP
+    # Troca de mensagens
     try:
-        while True: #enquanto true, tenta receber todas as mensagens disponíveis
-            data, addr = client_socket.recvfrom(1024) # tenta ler 1024 bytes da mensagem recebida
+        while True: 
+            data, addr = client_socket.recvfrom(1024) 
             msg = json.loads(data.decode())
+            
+            # Imprime no terminal do cliente o que foi recebido
+            print(f"[RECEBEU] <- {msg}")
+
             msg_type = msg.get("type")
             msg_data = msg.get("data")
 
-            if msg_type == "connected":
-                # le diretamente da msg não de msg_data
-                mensagem = f"Conectado! Você é o jogador {msg['numero_jogador']}. Esperando oponente..."
+            if msg_type == "waiting_for_opponent":
+                mensagem = "Esperando por um oponente..."
             
             elif msg_type == "game_start":
-                # novametne le diretamente da msg não de msg_data
-                meu_turno = msg["turno"]
+                meu_turno = msg.get("turno")
                 mensagem = "Seu turno!" if meu_turno else "Turno do oponente."
             
             elif msg_type == "tiro":
                 coordenada_tiro = tuple(msg_data)
                 tiros_inimigos.add(coordenada_tiro)
                 
-                # se a coordenado do tiro foi no meu batalhão, é um acerto do inimigo
-                if coordenada_tiro in meu_batalhao:
-                    enviar_mensagem("acerto", coordenada_tiro) #avisa ele que ele acertou
-                    # ve se eu ainda tenho partes do navio restantes, se não, o jogo acaba e eu perdi
+                if coordenada_tiro in meu_batalhao:        
+                    enviar_mensagem("acerto", coordenada_tiro) 
+                    
                     if all(parte_navio in tiros_inimigos for parte_navio in meu_batalhao):
                         enviar_mensagem("game_over", "Você venceu!")
                         mensagem = "Você Perdeu!"
@@ -148,13 +163,11 @@ while rodando:
                 else:
                     enviar_mensagem("erro", coordenada_tiro)
                 
-                # se o jogo não acabou, é meu turno
                 if not game_over:
                     meu_turno = True
                     mensagem = "Seu turno!"
 
             elif msg_type == "acerto":
-                #Marca a parte do navio inimigo que foi atingida
                 coordenada_tiro = tuple(msg_data)
                 danos_inimigos.add(coordenada_tiro)
                 rect_x = ENEMY_GRID_OFFSET_X + coordenada_tiro[1] * (GRID_SIZE + MARGIN)
@@ -166,19 +179,31 @@ while rodando:
                 game_over = True
                 meu_turno = False
 
+            elif msg_type == "opponent_disconnected":
+                mensagem = "Oponente desconectou. Você venceu!"
+                game_over = True
+                meu_turno = False
+
     except BlockingIOError:
-        # entra aqui quando não há mensagems para ler
         pass
 
-    # desenha o fundo e o grid do jogo
+    # Desenha o jogo na tela
     screen.fill(WHITE)
-    desenhaOsGrids(MY_GRID_OFFSET_X, MY_GRID_OFFSET_Y, "Seu Batalhão", show_ships=True)
-    desenhaOsGrids(ENEMY_GRID_OFFSET_X, ENEMY_GRID_OFFSET_Y, "Batalhão Inimigo")
     
-    # desenha a mensagem de status no topo da tela
+    if not game_over:
+        desenha_os_grids(MY_GRID_OFFSET_X, MY_GRID_OFFSET_Y, "Seu Batalhão", show_ships=True)
+        desenha_os_grids(ENEMY_GRID_OFFSET_X, ENEMY_GRID_OFFSET_Y, "Batalhão Inimigo")
+    
     status_surface = big_font.render(mensagem, True, BLACK)
-    screen.blit(status_surface, (SCREEN_WIDTH // 2 - status_surface.get_width() // 2, 20))
+    if game_over:
+        screen.blit(status_surface, (SCREEN_WIDTH // 2 - status_surface.get_width() // 2, SCREEN_HEIGHT // 2 - status_surface.get_height() // 2 - 20)) 
+    else:
+        screen.blit(status_surface, (SCREEN_WIDTH // 2 - status_surface.get_width() // 2, 20))
+
+    if game_over:
+        botao_jogar_novamente()
 
     pygame.display.flip()
 
 pygame.quit()
+client_socket.close()
