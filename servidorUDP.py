@@ -30,20 +30,20 @@ def remover_partida(id_partida):
 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     # Inicia o Servidor
-    s.bind((HOST, PORT))
+    s.bind((HOST, PORT)) # parametros que inicia o servidor da biblioteca
     print(f"Servidor de Lobbies UDP escutando em {HOST}:{PORT}...")
 
-    while True:
-        data, endereco = s.recvfrom(1024)
-        
-        try:
+    while True: #no laco de repeticao fica escutando as mensagens 
+        data, endereco = s.recvfrom(1024) #byte do buffer de mensagem, pq ele fica lendo o que ta recebendo para ler
+        # a partir disso verifica o que deve fazer 
+        try: 
             msg = json.loads(data.decode())
             msg_type = msg.get("type")
         except (json.JSONDecodeError, UnicodeDecodeError):
             print(f"[ERRO] Mensagem mal formatada de {endereco}")
             continue
 
-        # Lógica de novo jogador
+        # Lógica de novo jogador \ a partir dessa mensagem ele vai definir oq e 
         if msg_type == "join":
             if endereco in mapa_jogadores:
                 print(f"[AVISO] Jogador {endereco} tentou 'join' mas já está em uma partida.")
